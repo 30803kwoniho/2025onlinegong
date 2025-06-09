@@ -35,27 +35,24 @@ start_date = end_date - timedelta(days=365)
 
 @st.cache_data
 def fetch_prices(tickers, start, end):
-    # 티커를 쉼표로 연결
-    tickers_str = ",".join(tickers)
-    df = yf.download(tickers_str, start=start, end=end)
-
+    df = yf.download(tickers, start=start, end=end, group_by="ticker", progress=False)
     if df.empty:
         return pd.DataFrame()
 
-    # 다중 티커인 경우와 단일 티커 구분
     if len(tickers) == 1:
         ticker = tickers[0]
         if "Adj Close" in df.columns:
             return df[["Adj Close"]].rename(columns={"Adj Close": name_map[ticker]})
+        elif ticker in df.columns and "Adj Close" in df[ticker].columns:
+            return df[ticker][["Adj Close"]].rename(columns={"Adj Close": name_map[ticker]})
         else:
             return pd.DataFrame()
     else:
-        if "Adj Close" in df.columns:
-            adj_close = df["Adj Close"]
-            adj_close.columns = [name_map.get(t, t) for t in adj_close.columns]
-            return adj_close
-        else:
-            return pd.DataFrame()
+        adj_close = pd.DataFrame()
+        for ticker in tickers:
+            if ticker in df.columns and "Adj Close" in df[ticker].columns:
+                adj_close[name_map[ticker]] = df[ticker]["Adj Close"]
+        return adj_close
 
 df_prices = fetch_prices(tickers, start_date, end_date)
 
