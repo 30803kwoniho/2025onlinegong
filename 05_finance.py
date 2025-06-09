@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.express as px
-from datetime import datetime, timedelta  # ✅ timedelta 임포트 확인
+from datetime import datetime, timedelta
 
 # 페이지 설정
 st.set_page_config(page_title="📈 글로벌 주식 트렌드", layout="wide")
@@ -10,7 +10,7 @@ st.set_page_config(page_title="📈 글로벌 주식 트렌드", layout="wide")
 st.title("📈 글로벌 시가총액 TOP10 기업 주가 추이")
 st.markdown("💹 **최근 1년 간 주가와 누적 수익률을 시각화합니다.**")
 
-# 시가총액 기준 상위 10개 기업 정보 (2025 기준, yfinance 호환 티커 사용)
+# 시가총액 기준 상위 10개 기업 (yfinance용 티커 사용)
 company_info = {
     'Apple': 'AAPL',
     'Microsoft': 'MSFT',
@@ -35,31 +35,50 @@ if not selected_companies:
     st.warning("⚠️ 최소 하나 이상의 회사를 선택해주세요.")
     st.stop()
 
-# 티커 리스트 추출
+# 티커 리스트 및 이름 매핑
 tickers = [company_info[comp] for comp in selected_companies]
-ticker_to_name = {v: k for k, v in company_info.items()}  # 역매핑
+ticker_to_name = {v: k for k, v in company_info.items()}
 
-# 기간 설정
+# 기간 설정 (최근 1년)
 end_date = datetime.today()
-start_date = end_date - timedelta(days=365)  # ✅ 수정 완료
+start_date = end_date - timedelta(days=365)
 
 # 데이터 불러오기 함수
 @st.cache_data
 def load_price_data(tickers):
-    df = yf.download(tickers, start=start_date, end=end_date)["Adj Close"]
+    df = yf.download(tickers, start=start_date, end=end_date)
+
+    # 예외 처리: 빈 데이터프레임
+    if df.empty:
+        return pd.DataFrame()
+
+    # 'Adj Close' 확인 및 처리
+    if "Adj Close" in df.columns:
+        df = df["Adj Close"]
+    elif isinstance(df.columns, pd.MultiIndex) and ("Adj Close", tickers[0]) in df.columns:
+        df = df["Adj Close"]
+    else:
+        st.error("❌ 'Adj Close' 데이터를 찾을 수 없습니다. yfinance에서 데이터를 확인하세요.")
+        return pd.DataFrame()
+
+    # 단일 티커 선택 시 Series → DataFrame
     if isinstance(df, pd.Series):
-        df = df.to_frame()
-    df = df.dropna()
-    return df
+        df = df.to_frame(name=tickers[0])
+
+    return df.dropna()
 
 # 데이터 로드
 price_df = load_price_data(tickers)
 
+if price_df.empty:
+    st.error("📭 데이터를 불러올 수 없습니다. 선택한 기업의 주가 데이터가 없습니다.")
+    st.stop()
+
 # 컬럼 이름을 회사 이름으로 변환
 price_df.columns = [ticker_to_name.get(col, col) for col in price_df.columns]
 
-# 📊 주가 시각화
-st.subheader("📈 주가 추이")
+# 📈 주가 시각화
+st.subheader("📊 주가 추이")
 fig_price = px.line(
     price_df,
     x=price_df.index,
