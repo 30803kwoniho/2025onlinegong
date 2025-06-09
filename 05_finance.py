@@ -35,35 +35,49 @@ start_date = end_date - timedelta(days=365)
 
 @st.cache_data
 def fetch_prices(tickers, start, end):
-    df = yf.download(tickers, start=start, end=end, group_by="ticker", progress=False)
+    # yfinance는 다중티커를 리스트로 전달 가능
+    df = yf.download(tickers, start=start, end=end, progress=False, group_by='ticker')
+
     if df.empty:
         return pd.DataFrame()
 
+    # 다중/단일 티커 구분
     if len(tickers) == 1:
         ticker = tickers[0]
-        if "Adj Close" in df.columns:
-            return df[["Adj Close"]].rename(columns={"Adj Close": name_map[ticker]})
-        elif ticker in df.columns and "Adj Close" in df[ticker].columns:
-            return df[ticker][["Adj Close"]].rename(columns={"Adj Close": name_map[ticker]})
+        if ticker in df.columns:  # 간혹 이렇게 나올 수 있음
+            df_ticker = df[ticker]
+        else:
+            df_ticker = df
+        if "Adj Close" in df_ticker.columns:
+            series = df_ticker["Adj Close"].rename(name_map[ticker])
+            return pd.DataFrame(series)
         else:
             return pd.DataFrame()
     else:
+        # 다중 티커일 때는 (티커, 컬럼) 멀티 인덱스
         adj_close = pd.DataFrame()
         for ticker in tickers:
-            if ticker in df.columns and "Adj Close" in df[ticker].columns:
-                adj_close[name_map[ticker]] = df[ticker]["Adj Close"]
+            if ticker in df.columns:
+                temp = df[ticker]["Adj Close"].rename(name_map[ticker])
+                adj_close = pd.concat([adj_close, temp], axis=1)
+            elif "Adj Close" in df.columns:
+                # 혹시 단일 티커로 잘못 받아진 경우 대비
+                temp = df["Adj Close"].rename(name_map[ticker])
+                adj_close = pd.concat([adj_close, temp], axis=1)
+            else:
+                # 데이터가 없을 때 빈 데이터프레임 반환
+                return pd.DataFrame()
         return adj_close
 
 df_prices = fetch_prices(tickers, start_date, end_date)
 
-# 데이터프레임 상태 디버깅 출력
-st.write("### 데이터프레임 정보")
-st.write(df_prices.head())
-st.write(df_prices.columns)
-
 if df_prices.empty:
     st.error("📭 데이터를 불러올 수 없습니다. 선택한 기업의 주가 데이터가 없습니다.")
     st.stop()
+
+# 인덱스가 DatetimeIndex가 아니면 변환
+if not isinstance(df_prices.index, pd.DatetimeIndex):
+    df_prices.index = pd.to_datetime(df_prices.index)
 
 st.subheader("📊 주가 추이")
 fig_price = px.line(
