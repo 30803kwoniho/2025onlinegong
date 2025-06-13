@@ -1,5 +1,3 @@
-streamlit-folium
 streamlit
 pandas
 plotly
-yfinance
