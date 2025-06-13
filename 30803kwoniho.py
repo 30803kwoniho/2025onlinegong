@@ -55,3 +55,7 @@ try:
 
 except FileNotFoundError:
     st.error(f"데이터 파일이 '{DATA_PATH}' 경로에 없습니다.")
+import pandas as pd
+
+df = pd.read_csv("PJM_Load_hourly.csv")
+print(df.columns)
