@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
+df = pd.read_csv("PJM_Load_hourly.csv")
+print(df.columns)
 st.set_page_config(page_title="에너지 소비 효율 비교", layout="wide")
 
 st.title("📊 지역별 시간대 에너지 소비 비교")
@@ -56,6 +57,3 @@ try:
 except FileNotFoundError:
     st.error(f"데이터 파일이 '{DATA_PATH}' 경로에 없습니다.")
 import pandas as pd
-
-df = pd.read_csv("PJM_Load_hourly.csv")
-print(df.columns)
